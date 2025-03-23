@@ -113,7 +113,7 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
         """
         Here is where the processing itself takes place.
         """
-
+        # Ceci est un text pour tester le commit
         
 
         # Retrieve the feature source and sink. The 'dest_id' variable is used
