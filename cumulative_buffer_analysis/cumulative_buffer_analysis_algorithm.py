@@ -38,7 +38,8 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFeatureSink,
                        QgsProcessingParameterField,
                        QgsProcessingParameterString,
-                       QgsProcessingException
+                       QgsProcessingException,
+                       QgsFeature
                        )
 
 
