@@ -30,7 +30,7 @@ __copyright__ = '(C) 2025 by Jeremy Tem & Liam Messier'
 
 __revision__ = '$Format:%H$'
 
-from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtCore import (QCoreApplication,QVariant)
 from qgis.core import (QgsProcessing,
                        QgsFeatureSink,
                        QgsProcessingAlgorithm,
@@ -40,7 +40,9 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterString,
                        QgsProcessingException,
                        QgsFeature,
-                       QgsWkbTypes
+                       QgsWkbTypes,
+                       QgsFields,
+                       QgsField
                        )
 
 
@@ -116,8 +118,9 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
         """
         Here is where the processing itself takes place.
         """
-        # Ceci est un text pour tester le commit
         
+        my_fields = QgsFields()
+        my_fields.append(QgsField('area', QVariant.Double))
 
         # Retrieve the feature source and sink. The 'dest_id' variable is used
         # to uniquely identify the feature sink, and must be included in the
@@ -126,7 +129,7 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
         category_field = self.parameterAsString(parameters, self.FIELD, context)
         distances = self.parameterAsString(parameters, self.DISTANCES, context).split(',')
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
-                context, source.fields(),  QgsWkbTypes.Polygon, source.sourceCrs())
+                context, my_fields, QgsWkbTypes.Polygon, source.sourceCrs())
         
         # Error message
         if not source or not category_field or not distances or not sink:
@@ -159,11 +162,17 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
             buffer_features.append(new_feature)
             feedback.setProgress(int(current * total))
 
-            # Add a feature in the sink
-            sink.addFeature(new_feature, QgsFeatureSink.FastInsert)
-
-            # Update the progress bar
-            feedback.setProgress(int(current * total))
+        if buffer_features:
+            merged_geom = buffer_features[0].geometry()
+            for feat in buffer_features[1:]:
+                merged_geom = merged_geom.combine(feat.geometry())
+            merged_feature = QgsFeature()
+            merged_feature.setGeometry(merged_geom)
+            merged_feature.setAttributes([merged_geom.area()])
+            sink.addFeature(merged_feature, QgsFeatureSink.FastInsert)
+        
+            feedback.pushInfo(f'Merged buffer area: {merged_geom.area()} m²')
+            
 
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
