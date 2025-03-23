@@ -37,7 +37,8 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterFeatureSource,
                        QgsProcessingParameterFeatureSink,
                        QgsProcessingParameterField,
-                       QgsProcessingParameterString
+                       QgsProcessingParameterString,
+                       QgsProcessingException
                        )
 
 
@@ -120,8 +121,16 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
         source = self.parameterAsSource(parameters, self.INPUT, context)
+        category_field = self.parameterAsString(parameters, self.FIELD, context)
+        distances = self.parameterAsString(parameters, self.DISTANCES, context).split(',')
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
                 context, source.fields(), source.wkbType(), source.sourceCrs())
+        
+        # Error message
+        if not source or not category_field or not distances or not sink:
+            raise QgsProcessingException('Invalid input parameters')
+        
+
 
         # Compute the number of steps to display within the progress bar and
         # get features from source
