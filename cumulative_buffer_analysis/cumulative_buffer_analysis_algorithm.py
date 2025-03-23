@@ -135,12 +135,27 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
         # Compute the number of steps to display within the progress bar and
         # get features from source
         total = 100.0 / source.featureCount() if source.featureCount() else 0
+
+        buffer_features = []
+        
+        
         features = source.getFeatures()
 
         for current, feature in enumerate(features):
             # Stop the algorithm if cancel button has been clicked
             if feedback.isCanceled():
                 break
+
+            category = int(feature[category_field])
+            if category < 0 or category >= len(distances):
+                continue
+
+            # Création du tampon pour la catégorie actuelle
+            buffer_geom = feature.geometry().buffer(distances[category], 5)
+            new_feature = QgsFeature()
+            new_feature.setGeometry(buffer_geom)
+            buffer_features.append(new_feature)
+            feedback.setProgress(int(current * total))
 
             # Add a feature in the sink
             sink.addFeature(feature, QgsFeatureSink.FastInsert)
