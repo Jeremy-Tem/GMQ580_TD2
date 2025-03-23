@@ -39,7 +39,8 @@ from qgis.core import (QgsProcessing,
                        QgsProcessingParameterField,
                        QgsProcessingParameterString,
                        QgsProcessingException,
-                       QgsFeature
+                       QgsFeature,
+                       QgsWkbTypes
                        )
 
 
@@ -97,7 +98,7 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterString(
                 self.DISTANCES,
                 self.tr('List of buffer distances (comma separated), e.g. 10,20,30'),
-                self.tr('*Vérifier le nombre de valeurs uniques dans le champ sélectionné*')
+                self.tr('10,20,30,40,50,60,70,80')
             )
         )
 
@@ -125,7 +126,7 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
         category_field = self.parameterAsString(parameters, self.FIELD, context)
         distances = self.parameterAsString(parameters, self.DISTANCES, context).split(',')
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
-                context, source.fields(), source.wkbType(), source.sourceCrs())
+                context, source.fields(),  QgsWkbTypes.Polygon, source.sourceCrs())
         
         # Error message
         if not source or not category_field or not distances or not sink:
@@ -152,14 +153,14 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
                 continue
 
             # Création du tampon pour la catégorie actuelle
-            buffer_geom = feature.geometry().buffer(distances[category], 5)
+            buffer_geom = feature.geometry().buffer(int(distances[category]), 5)
             new_feature = QgsFeature()
             new_feature.setGeometry(buffer_geom)
             buffer_features.append(new_feature)
             feedback.setProgress(int(current * total))
 
             # Add a feature in the sink
-            sink.addFeature(feature, QgsFeatureSink.FastInsert)
+            sink.addFeature(new_feature, QgsFeatureSink.FastInsert)
 
             # Update the progress bar
             feedback.setProgress(int(current * total))
