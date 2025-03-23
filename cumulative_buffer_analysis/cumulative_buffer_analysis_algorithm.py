@@ -48,21 +48,11 @@ from qgis.core import (QgsProcessing,
 
 class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
     """
-    This is an example algorithm that takes a vector layer and
-    creates a new identical one.
-
-    It is meant to be used as an example of how to create your own
-    algorithms and explain methods and variables used to do it. An
-    algorithm like this will be available in all elements, and there
-    is not need for additional work.
-
-    All Processing algorithms should extend the QgsProcessingAlgorithm
-    class.
+    Cette classe implémente un algorithme QGIS qui génère des tampons cumulés autour des 
+    points d'une couche en fonction d'un champ catégorique et d'une liste de distances.
     """
 
-    # Constants used to refer to parameters and outputs. They will be
-    # used when calling the algorithm from another algorithm, or when
-    # calling from the QGIS console.
+    # Définition des constantes pour les paramètres et les sorties
 
     OUTPUT = 'OUTPUT'
     INPUT = 'INPUT'
@@ -72,12 +62,10 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
 
     def initAlgorithm(self, config):
         """
-        Here we define the inputs and output of the algorithm, along
-        with some other properties.
+        Définition des entrées et sorties de l'algorithme.
         """
 
-        # We add the input vector features source. It can have any kind of
-        # geometry.
+        # Paramètre : couche source de points
         self.addParameter(
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
@@ -86,8 +74,7 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
-        # We add an input that allows the user to choose a field from the
-        # attribute table of the input layer
+        # Paramètre : champ utilisé pour catégoriser les distances des tampons
         self.addParameter(
             QgsProcessingParameterField(
                 self.FIELD,
@@ -96,17 +83,16 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
             )
         )
 
+        # Paramètre : liste des distances des tampons (séparées par des virgules)
         self.addParameter(
             QgsProcessingParameterString(
                 self.DISTANCES,
                 self.tr('List of buffer distances (comma separated), e.g. 10,20,30'),
-                self.tr('10,20,30,40,50,60,70,80')
+                self.tr('Vérifier combien de valeur unique dans le champ et ajouter les distances')
             )
         )
 
-        # We add a feature sink in which to store our processed features (this
-        # usually takes the form of a newly created vector layer when the
-        # algorithm is run in QGIS).
+        # Paramètre : couche de sortie pour stocker les tampons générés
         self.addParameter(
             QgsProcessingParameterFeatureSink(
                 self.OUTPUT,
@@ -116,70 +102,65 @@ class CumulativeBufferAnalysisAlgorithm(QgsProcessingAlgorithm):
 
     def processAlgorithm(self, parameters, context, feedback):
         """
-        Here is where the processing itself takes place.
+        Exécution principale de l'algorithme.
         """
-        
+        # Définition des champs pour la couche de sortie
         my_fields = QgsFields()
-        my_fields.append(QgsField('area', QVariant.Double))
+        my_fields.append(QgsField('area', QVariant.Double)) # Champ pour stocker l'aire des tampons
 
-        # Retrieve the feature source and sink. The 'dest_id' variable is used
-        # to uniquely identify the feature sink, and must be included in the
-        # dictionary returned by the processAlgorithm function.
-        source = self.parameterAsSource(parameters, self.INPUT, context)
-        category_field = self.parameterAsString(parameters, self.FIELD, context)
-        distances = self.parameterAsString(parameters, self.DISTANCES, context).split(',')
+        # Récupération des paramètres d'entrée
+        source = self.parameterAsSource(parameters, self.INPUT, context) # Couche source
+        category_field = self.parameterAsString(parameters, self.FIELD, context) # Champ catégorique
+        distances = self.parameterAsString(parameters, self.DISTANCES, context).split(',') # Liste des distances
+        
+        # Création de la couche de sortie
         (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,
                 context, my_fields, QgsWkbTypes.Polygon, source.sourceCrs())
         
-        # Error message
+        # Vérification des paramètres
         if not source or not category_field or not distances or not sink:
             raise QgsProcessingException('Invalid input parameters')
         
 
 
-        # Compute the number of steps to display within the progress bar and
-        # get features from source
+        # Calcul du nombre d'étapes pour la barre de progression
         total = 100.0 / source.featureCount() if source.featureCount() else 0
 
-        buffer_features = []
+        buffer_features = [] # Liste pour stocker les tampons générés
         
-        
-        features = source.getFeatures()
+        features = source.getFeatures() # Récupération des entités de la couche source
 
+        # Boucle sur chaque entité de la couche source
         for current, feature in enumerate(features):
-            # Stop the algorithm if cancel button has been clicked
+            # Arrêter l'algorithme si l'utilisateur clique sur "Annuler"
             if feedback.isCanceled():
                 break
-
-            category = int(feature[category_field])
-            if category < 0 or category >= len(distances):
+            # Récupération de la catégorie
+            category = int(feature[category_field]) - 1 #ajustement pour correspondre à l'index des distances
+            if category < 0 or category >= len(distances): # Vérification de la validité de la catégorie
                 continue
 
             # Création du tampon pour la catégorie actuelle
             buffer_geom = feature.geometry().buffer(int(distances[category]), 5)
             new_feature = QgsFeature()
-            new_feature.setGeometry(buffer_geom)
-            buffer_features.append(new_feature)
-            feedback.setProgress(int(current * total))
+            new_feature.setGeometry(buffer_geom) # Définir la géométrie du tampon
+            buffer_features.append(new_feature) # Ajouter le tampon à la liste
+            feedback.setProgress(int(current * total)) # Mise à jour de la barre de progression
 
+        # Fusion des tampons si des tampons ont été générés
         if buffer_features:
-            merged_geom = buffer_features[0].geometry()
+            merged_geom = buffer_features[0].geometry() # Géométrie fusionnée initiale
             for feat in buffer_features[1:]:
-                merged_geom = merged_geom.combine(feat.geometry())
+                merged_geom = merged_geom.combine(feat.geometry()) # Fusion des géométries
             merged_feature = QgsFeature()
-            merged_feature.setGeometry(merged_geom)
-            merged_feature.setAttributes([merged_geom.area()])
-            sink.addFeature(merged_feature, QgsFeatureSink.FastInsert)
+            merged_feature.setGeometry(merged_geom) # Définir la géométrie fusionnée
+            merged_feature.setAttributes([merged_geom.area()]) # Définir l'aire comme attribut
+            sink.addFeature(merged_feature, QgsFeatureSink.FastInsert) # Ajouter à la couche de sortie
         
-            feedback.pushInfo(f'Merged buffer area: {merged_geom.area()} m²')
+            feedback.pushInfo(f'Merged buffer area: {merged_geom.area()} m²') # Afficher l'aire fusionnée
             
 
-        # Return the results of the algorithm. In this case our only result is
-        # the feature sink which contains the processed features, but some
-        # algorithms may return multiple feature sinks, calculated numeric
-        # statistics, etc. These should all be included in the returned
-        # dictionary, with keys matching the feature corresponding parameter
-        # or output names.
+        # Retourner la couche de sortie
         return {self.OUTPUT: dest_id}
 
     def name(self):
